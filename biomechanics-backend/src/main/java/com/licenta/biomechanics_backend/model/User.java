@@ -20,7 +20,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
-//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-//    private List<Assessment> assessments;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<Assessment> assessments;
 
 }
