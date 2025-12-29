@@ -1,5 +1,6 @@
 package com.licenta.biomechanics_backend.logic;
 
+import com.licenta.biomechanics_backend.constants.BiomechanicalConstants;
 import com.licenta.biomechanics_backend.model.enums.BiomechanicsMetric;
 import org.springframework.stereotype.Component;
 import java.util.ArrayList;
@@ -9,98 +10,99 @@ import lombok.Data;
 @Component
 public class ScoringEngine {
 
-    private static final double W_NECK = 3.0;
-    private static final double W_Q = 2.0;
-    private static final double W_SHOULDER = 1.0;
-
-
     @Data
-    public static class FinalReport {
+    public static class FinalReport{
         double gpsScore;
         String riskLevel;
         List<MetricDetail> details = new ArrayList<>();
     }
 
     @Data
-    public static class MetricDetail {
+    public static class MetricDetail{
         BiomechanicsMetric name;
         double value;
         double penalty;
         String recommendation;
     }
 
-
     public FinalReport computeReport(int age, String gender,
                                      double fhp, double qAngle, double shDiff,
                                      double stancePhase, double kneeFlexion, double cadence) {
-
         FinalReport report = new FinalReport();
         double totalWeightedScore = 0;
         double totalWeights = 0;
 
+        double fhpMax = (age > BiomechanicalConstants.AGE_ELDERLY_THRESHOLD)
+                ? BiomechanicalConstants.FHP_MAX_ELDERLY
+                : BiomechanicalConstants.FHP_MAX_STANDARD;
 
-        double fhpMax = (age > 60) ? 6.0 : 5.0;
         double sFHP = calculatePenalty(fhp, 0, fhpMax);
-
-        totalWeightedScore += sFHP * W_NECK;
-        totalWeights += W_NECK;
+        totalWeightedScore += sFHP * BiomechanicalConstants.WEIGHT_CERVICAL_FHP;
+        totalWeights += BiomechanicalConstants.WEIGHT_CERVICAL_FHP;
 
         addDetail(report, BiomechanicsMetric.FORWARD_HEAD_POSTURE, fhp, sFHP,
-                sFHP > 0 ? "Exercise: Chin Tucks (Cervical Retraction)" : null);
+                sFHP > 0 ? BiomechanicalConstants.RECOMMENDATION_FHP : null);
 
+        double qMin = gender.equalsIgnoreCase("MALE")
+                ? BiomechanicalConstants.Q_ANGLE_MALE_MIN
+                : BiomechanicalConstants.Q_ANGLE_FEMALE_MIN;
+        double qMax = gender.equalsIgnoreCase("MALE")
+                ? BiomechanicalConstants.Q_ANGLE_MALE_MAX
+                : BiomechanicalConstants.Q_ANGLE_FEMALE_MAX;
 
-        double qMin = gender.equalsIgnoreCase("MALE") ? 10 : 15;
-        double qMax = gender.equalsIgnoreCase("MALE") ? 14 : 17;
-
-        if (age > 60) { qMin *= 0.85; qMax *= 1.15; }
+        if (age > BiomechanicalConstants.AGE_ELDERLY_THRESHOLD) {
+            qMin *= BiomechanicalConstants.AGE_ROM_ADJUSTMENT_FACTOR;
+            qMax *= BiomechanicalConstants.AGE_TOLERANCE_INCREASE;
+        }
 
         double sQ = calculatePenalty(qAngle, qMin, qMax);
-        totalWeightedScore += sQ * W_Q;
-        totalWeights += W_Q;
+        totalWeightedScore += sQ * BiomechanicalConstants.WEIGHT_Q_ANGLE;
+        totalWeights += BiomechanicalConstants.WEIGHT_Q_ANGLE;
 
         addDetail(report, BiomechanicsMetric.Q_ANGLE, qAngle, sQ,
-                sQ > 0 ? "Exercise: Quadriceps Isometric Contraction" : null);
+                sQ > 0 ? BiomechanicalConstants.RECOMMENDATION_Q_ANGLE : null);
 
-
-        double shMax = 0.015;
-        double sSh = calculatePenalty(shDiff, 0, shMax);
-        totalWeightedScore += sSh * W_SHOULDER;
-        totalWeights += W_SHOULDER;
+        double sSh = calculatePenalty(shDiff, 0, BiomechanicalConstants.SHOULDER_SYMMETRY_MAX);
+        totalWeightedScore += sSh * BiomechanicalConstants.WEIGHT_SHOULDER;
+        totalWeights += BiomechanicalConstants.WEIGHT_SHOULDER;
 
         addDetail(report, BiomechanicsMetric.SHOULDER_SYMMETRY, shDiff, sSh,
-                sSh > 0 ? "Recommendation: Check backpack/bag carrying habits. Bilateral stretching." : null);
+                sSh > 0 ? BiomechanicalConstants.RECOMMENDATION_SHOULDER : null);
 
-        double stanceMin = 57.0;
-        double stanceMax = 63.0;
-        double sStance = calculatePenalty(stancePhase, stanceMin, stanceMax);
+        double sStance = calculatePenalty(stancePhase,
+                BiomechanicalConstants.STANCE_PHASE_MIN,
+                BiomechanicalConstants.STANCE_PHASE_MAX);
 
         addDetail(report, BiomechanicsMetric.GAIT_STANCE_PHASE, stancePhase, sStance,
-                sStance > 0 ? "Alert: Gait asymmetry. Possible antalgic gait (pain-avoidance pattern)." : null);
+                sStance > 0 ? BiomechanicalConstants.RECOMMENDATION_GAIT_ASYMMETRY : null);
 
+        double kneeMin = (age > BiomechanicalConstants.AGE_ELDERLY_THRESHOLD)
+                ? BiomechanicalConstants.KNEE_FLEXION_MIN_ELDERLY
+                : BiomechanicalConstants.KNEE_FLEXION_MIN_STANDARD;
 
-        double kneeMin = (age > 60) ? 55.0 : 60.0;
-        double kneeMax = 70.0;
-        double sKnee = calculatePenalty(kneeFlexion, kneeMin, kneeMax);
+        double sKnee = calculatePenalty(kneeFlexion, kneeMin,
+                BiomechanicalConstants.KNEE_FLEXION_MAX);
 
         addDetail(report, BiomechanicsMetric.KNEE_FLEXION_SWING, kneeFlexion, sKnee,
-                sKnee > 0 && kneeFlexion < kneeMin ? "Risk: Insufficient flexion. Risk of tripping." : null);
+                sKnee > 0 && kneeFlexion < kneeMin
+                        ? BiomechanicalConstants.RECOMMENDATION_KNEE_FLEXION : null);
 
 
-        double cadMin = 100.0;
-        double cadMax = 120.0;
+        double cadMin = (age > BiomechanicalConstants.AGE_ELDERLY_THRESHOLD)
+                ? BiomechanicalConstants.CADENCE_MIN_ELDERLY
+                : BiomechanicalConstants.CADENCE_MIN_STANDARD;
 
-        if (age > 60) cadMin = 90.0;
-
-        double sCadence = calculatePenalty(cadence, cadMin, cadMax);
+        double sCadence = calculatePenalty(cadence, cadMin, BiomechanicalConstants.CADENCE_MAX);
 
         addDetail(report, BiomechanicsMetric.CADENCE, cadence, sCadence,
-                sCadence > 0 && cadence < cadMin ? "Alert: Low cadence. Balance exercises recommended." : null);
+                sCadence > 0 && cadence < cadMin
+                        ? BiomechanicalConstants.RECOMMENDATION_CADENCE_LOW : null);
+
         report.gpsScore = (totalWeights > 0) ? (totalWeightedScore / totalWeights) : 0;
 
-
-        if (report.gpsScore <= 20)
+        if (report.gpsScore <= BiomechanicalConstants.RISK_OPTIMAL_MAX)
             report.riskLevel = "OPTIMAL";
-        else if (report.gpsScore <= 50)
+        else if (report.gpsScore <= BiomechanicalConstants.RISK_MODERATE_MAX)
             report.riskLevel = "MODERATE";
         else
             report.riskLevel = "ELEVATED";
@@ -108,7 +110,8 @@ public class ScoringEngine {
         return report;
     }
 
-    private void addDetail(FinalReport report, BiomechanicsMetric name, double val, double penalty, String rec) {
+    private void addDetail(FinalReport report, BiomechanicsMetric name,
+                           double val, double penalty, String rec) {
         MetricDetail md = new MetricDetail();
         md.setName(name);
         md.setValue(val);
@@ -123,6 +126,7 @@ public class ScoringEngine {
         double limit = (val < min) ? min : max;
         double deviation = Math.abs(val - limit);
 
-        return Math.min((deviation / limit) * 10.0, 100.0);
+        return Math.min((deviation / limit) * BiomechanicalConstants.PENALTY_MULTIPLIER,
+                BiomechanicalConstants.PENALTY_MAX_VALUE);
     }
 }
