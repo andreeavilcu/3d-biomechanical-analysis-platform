@@ -2,6 +2,120 @@ spring:
   application:
     name: biomechanics-backend
 
+
+  datasource:
+    url:
+    username:
+    password:
+    driver-class-name:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 55MB
+      file-size-threshold: 2MB
+
+
+  jackson:
+    serialization:
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+
 server:
   port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
 
+python:
+  service:
+    url: ${PYTHON_SERVICE_URL:http://localhost:5000}
+    timeout: 60000
+    max-retries: 3
+
+logging:
+  level:
+    root: INFO
+    com.licenta.biomechanics_backend: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/biomechanics-backend.log
+    max-size: 10MB
+    max-history: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+app:
+  biomechanics:
+    thresholds:
+      q-angle:
+        male-min: 10.0
+        male-max: 14.0
+        female-min: 15.0
+        female-max: 17.0
+      fhp:
+        standard-max: 5.0
+        elderly-max: 6.0
+      shoulder-symmetry-max: 0.015
+      stance-phase:
+        min: 57.0
+        max: 63.0
+      knee-flexion:
+        standard-min: 60.0
+        elderly-min: 55.0
+        max: 70.0
+      cadence:
+        standard-min: 100.0
+        elderly-min: 90.0
+        max: 120.0
+
+    age:
+      elderly-threshold: 60
+      adjustment-factor: 0.85
+
+    scoring:
+      weights:
+        neck: 3.0
+        q-angle: 2.0
+        shoulder: 1.0
+      risk-levels:
+        optimal-max: 20.0
+        moderate-max: 50.0

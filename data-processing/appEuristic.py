@@ -143,6 +143,11 @@ def process_scan():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """ Health check endpoint """
+    return jsonify({"status": "healthy", "service": "python-processing"}), 200
+
 if __name__ == '__main__':
     # Start the server on port 5000
     print(">>> Starting AI Python server on port 5000...")
